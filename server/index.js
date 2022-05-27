@@ -14,6 +14,7 @@ let espClient;
 let state = {
   led_status: false,
   esp_status: false,
+  esp_lastupdate: null,
 };
 
 app.set("view engine", "ejs");
@@ -22,9 +23,11 @@ app.get("/", (_, res) => {
   res.render("main");
 });
 
-const onStateUpdate = (client) => {
+const onStateUpdate = ({ exclude, client } = {}) => {
   if (client) {
     client.emit("state_update", state);
+  } else if (exclude) {
+    exclude.broadcast.emit("state_update", state);
   } else {
     io.emit("state_update", state);
   }
@@ -32,7 +35,7 @@ const onStateUpdate = (client) => {
 
 io.on("connection", (client) => {
   console.log(`Client ${client.id} connected!`);
-  onStateUpdate(client);
+  onStateUpdate({ client });
 
   client.on("client", (data) => {
     if (data === "esp") {
@@ -43,6 +46,16 @@ io.on("connection", (client) => {
     }
   });
 
+  client.on("state_update", (data) => {
+    state = { ...state, ...data };
+
+    if (client.id === espClient?.id) {
+      state.esp_lastupdate = Date.now();
+    }
+
+    onStateUpdate({ exclude: client });
+  });
+
   client.on("set_led", (data) => {
     state.led_status = data;
     onStateUpdate();
@@ -51,7 +64,7 @@ io.on("connection", (client) => {
   client.on("disconnect", () => {
     console.log(`Client ${client.id} disconnected!`);
 
-    if (espClient?.id === client.id) {
+    if (client.id === espClient?.id) {
       espClient = null;
       state.esp_status = false;
       onStateUpdate();
