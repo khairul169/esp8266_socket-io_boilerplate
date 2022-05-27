@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Document</title>
+
+  <style>
+    .led-indicator {
+      display: inline-block;
+      background-color: blue;
+      width: 16px;
+      height: 16px;
+      border-radius: 16px;
+      opacity: 0.2;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>ESP8266 Status:</h1>
+  <p>ESP: <span id="esp-status">-</span></p>
+  <p>LED: <span id="led-status">-</span></p>
+  <button type="button" id="toggle-led">Turn LED on</button>
+
+  <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"
+    integrity="sha384-7EyYLQZgWBi67fBtVxw60/OWl1kjsfrPFcaU0pp0nAh+i8FD068QogUvg85Ewy1k"
+    crossorigin="anonymous"></script>
+  <script>
+    (() => {
+      let state = {
+        esp_status: false,
+        led_status: false,
+      };
+
+      const socket = io();
+      const espStatusEl = document.getElementById("esp-status");
+      const ledStatusEl = document.getElementById("led-status");
+      const ledToggleBtn = document.getElementById("toggle-led");
+
+      socket.on("connect", () => {
+        console.log('on connect', socket.id);
+      });
+
+      socket.on("state_update", (data) => {
+        const { esp_status, led_status } = data;
+        state = { ...data };
+
+        espStatusEl.innerText = esp_status ? 'Active' : 'Inactive';
+        espStatusEl.style.color = esp_status ? 'green' : 'red';
+
+        ledStatusEl.innerHTML = `<div class="led-indicator" style="opacity: ${led_status ? '1.0' : '0.2'};"></div>`;
+        ledToggleBtn.innerText = `Turn LED ${led_status ? 'off' : 'on'}`;
+
+        console.log('state update', state);
+      });
+
+      socket.on("disconnect", () => {
+        console.log('on disconnect', socket.id);
+      });
+
+      ledToggleBtn.onclick = () => {
+        socket.emit('set_led', !state.led_status);
+      }
+    })();
+  </script>
+</body>
+
+</html>
